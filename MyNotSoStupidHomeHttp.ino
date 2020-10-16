@@ -62,6 +62,7 @@ void ConnectAndStartServer(){
   server.on("/getTemperatureAndHumidity", handleTemperatureAndHumidity);
   server.on("/setLightState/",handleLightState);
   server.on("/startWatering",handlePump);
+  server.on("/startFeeding",handleFeeder);
   server.onNotFound(handleNotFound);
 
   server.begin();
@@ -69,6 +70,9 @@ void ConnectAndStartServer(){
   Serial.println("HTTP server started");
 }
 
+void handleFeeder(){
+	server.send(200,"text/plain","Feeding done");
+}
 void handleLightState(){
   String message = "";
   if (server.method() != HTTP_POST) {
