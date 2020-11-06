@@ -1,44 +1,59 @@
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include "DHT.h"
+#include <DHT.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>
+#include <Servo.h>
+
 
 #define DHTTYPE DHT11 
+
+//DHT11 sensor pin
 #define DHTPin  4
+
+// Water pump pins
+#define ENBPin 2 // PWM pin 6
+#define IN3Pin 12
+#define IN4Pin  13
+
+//Servo pin
+#define SERVOPin 15
+
+// Light relay pin
+#define LIGHTPin  5
+
+
+// Define NTP Client to get time
 
 const char* ssid     = "ZTE_AAB74C";
 const char* password = "43626416";
 
+const long utcOffsetInSeconds = 3600;
+
 ESP8266WebServer server(80);
 DHT dht(DHTPin, DHTTYPE);
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", utcOffsetInSeconds);
+Servo servo1;
 
 static float celsiusTemp;
 static float humidityTemp;
 static int lightState;
 
-// Assign output variables to GPIO pins
-const int lightPin = 5;
-
-// Water pump pins
-const int enb = 2; // PWM pin 6
-const int in3 = 12;
-const int in4 = 13;
-
-
 void setup() {
   Serial.begin(115200);
-
+ // startTime = millis();
+  servo1.attach(SERVOPin);
   dht.begin();
 
   // Initialize the output variables as outputs
-  pinMode(lightPin, OUTPUT);
-  pinMode(in3, OUTPUT);
-  pinMode(in4, OUTPUT);
-  pinMode(enb, OUTPUT);
+  pinMode(LIGHTPin, OUTPUT);
+  pinMode(IN3Pin, OUTPUT);
+  pinMode(IN4Pin, OUTPUT);
+  pinMode(ENBPin, OUTPUT);
   
   // Set outputs to LOW
-  digitalWrite(lightPin, LOW);
+  digitalWrite(LIGHTPin, LOW);
   ConnectAndStartServer();
 }
 
@@ -51,6 +66,7 @@ void ConnectAndStartServer(){
     delay(500);
     Serial.print(".");
   }
+  
   // Print local IP address and start web server
   Serial.println("");
   Serial.println("WiFi connected.");
@@ -71,7 +87,14 @@ void ConnectAndStartServer(){
 }
 
 void handleFeeder(){
-	server.send(200,"text/plain","Feeding done");
+  servo1.write(0);
+  delay(500);
+  servo1.write(90);
+  delay(500);
+  servo1.write(0);
+  delay(500);	
+  
+  server.send(200,"text/plain","Feeding done");
 }
 void handleLightState(){
   String message = "";
@@ -120,16 +143,18 @@ void handleNotFound() {
 }
 void handlePump(){
     // Run water pump
-    digitalWrite(in3, LOW);
-    digitalWrite(in4, HIGH);
-    digitalWrite(enb, HIGH);
+    digitalWrite(IN3Pin, LOW);
+    digitalWrite(IN4Pin, HIGH);
+    digitalWrite(ENBPin, HIGH);
+    
     // Make pump run for 6 sec.
     Serial.println("Watering..");
     delay(6000);
+    
     // Stop pump
-    digitalWrite(in3, LOW);
-    digitalWrite(in4, LOW);
-    digitalWrite(enb, LOW);
+    digitalWrite(IN3Pin, LOW);
+    digitalWrite(IN4Pin, LOW);
+    digitalWrite(ENBPin, LOW);
 
     Serial.println("Watering done.");
 
@@ -139,11 +164,40 @@ void handlePump(){
 void loop(void) {
   server.handleClient();
   MDNS.update();
-}
+  getTime();
+ /* if (millis() - startTime > TWELVE_HRS)
+  {
+    // Put your code that runs every 12 hours here
 
+    startTime = millis();
+  }*/
+}
+void getTime() {
+  timeClient.update();
+
+  int hours = timeClient.getHours();
+  int minutes = timeClient.getMinutes();
+  int seconds = timeClient.getSeconds();
+
+  if(hours == 8 && 
+     minutes == 0 && 
+     seconds == 0)
+  {
+      handlePump();
+      handleFeeder();
+  }
+
+  if(hours == 18 && 
+     minutes == 0 && 
+     seconds == 0)
+  {
+      handleFeeder();
+  }
+
+  delay(1000);
+}
 void SetLight(int state){
-  
-  digitalWrite(lightPin, state);
+  digitalWrite(LIGHTPin, state);
   lightState = state;
 }
 bool ReadDHT11(){
