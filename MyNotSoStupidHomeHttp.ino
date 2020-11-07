@@ -30,8 +30,8 @@ File myFile;
 const int chipSelect = D8;  // used for ESP8266
 
 //WiFi 
-const char* ssid     = "ZTE_AAB74C";
-const char* password = "43626416";
+const char* ssid     = "wifiname";
+const char* password = "pass";
 
 //UTC + offset 
 const long utcOffsetInSeconds = 3600;
